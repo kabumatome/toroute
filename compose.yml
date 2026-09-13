@@ -1,0 +1,24 @@
+services:
+  toroute:
+    image: ghcr.io/kabumatome/toroute:1.0.0
+    restart: unless-stopped
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /run/toroute:uid=65532,gid=65532,mode=0700
+    volumes:
+      - toroute-data:/var/lib/toroute
+    networks:
+      client: {}
+      egress:
+        # Compose 2.33.1+ explicitly selects the external default route.
+        gw_priority: 1
+
+networks:
+  client:
+    internal: true
+  egress: {}
+
+volumes:
+  toroute-data: {}

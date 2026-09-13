@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "status": "active",
+  "max_image_size_bytes": 180000000,
+  "max_package_count": 115,
+  "max_bootstrap_milliseconds": 180000,
+  "max_steady_memory_bytes": 230686720,
+  "max_idle_cpu_usec_per_second": 50000,
+  "max_pids": 48,
+  "notes": "Limits remain unchanged and are validated against the reviewed 2026-07-22 ToRoute 0.4.0-rc.8 full-http amd64 baseline: image 140775431 bytes, 101 packages, bootstrap 17647 ms, steady memory max 152064000 bytes, idle CPU 36056 usec/s, 28 PIDs/threads."
+}

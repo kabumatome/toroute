@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible ToRoute defect without exposing secrets.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include bridge lines, control cookies, tokens, private hostnames, personal paths, or proprietary traffic. Security vulnerabilities belong in private vulnerability reporting, not a public issue.
+  - type: input
+    id: version
+    attributes:
+      label: Exact image reference
+      description: Include the version and, preferably, the sha256 digest.
+      placeholder: ghcr.io/owner/toroute@sha256:...
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: linux/amd64, Docker Engine 28.x, Compose 2.33.x
+    validations:
+      required: true
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Sanitized minimal configuration
+      description: Remove secrets and private identifiers. Prefer the smallest reproducer.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Include `toroute status --json`, health state, and whether an independent SOCKS5h request succeeds. Do not paste secrets.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed bridge lines, cookies, credentials, private names, and personal paths.
+          required: true
+        - label: I searched existing issues and the troubleshooting documentation.
+          required: true

@@ -1,0 +1,12 @@
+.git
+.github
+bin
+release
+coverage.out
+*.zip
+*.tar.gz
+*.sha256
+.env
+bridges.txt
+__pycache__
+*.pyc

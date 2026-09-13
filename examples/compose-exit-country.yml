@@ -1,0 +1,16 @@
+services:
+  toroute:
+    image: ghcr.io/kabumatome/toroute:1.0.0
+    environment:
+      TOROUTE_EXIT_COUNTRIES: "jp"
+      TOROUTE_STRICT_EXIT: "true"
+      TOROUTE_EXCLUDE_EXIT_COUNTRIES: "cn,ru,kp,ir,sy"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /run/toroute:uid=65532,gid=65532,mode=0700
+    volumes:
+      - toroute-data:/var/lib/toroute
+volumes:
+  toroute-data: {}

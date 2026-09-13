@@ -1,0 +1,10 @@
+ToRoute
+Copyright 2026 ToRoute contributors
+
+This is an independent community project. It is not developed, endorsed, or
+supported by The Tor Project. “Tor” and the onion logo are trademarks of The
+Tor Project.
+
+ToRoute is not an official successor to dperson/torproxy. Its limited migration
+interface was designed from publicly documented behavior; no dperson/torproxy
+source code is included.

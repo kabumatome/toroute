@@ -1,0 +1,351 @@
+name: Release image
+on:
+  push:
+    tags: ['v*']
+permissions: {}
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: ${{ vars.TOROUTE_RELEASES_ENABLED == 'true' }}
+    permissions: {contents: read}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {fetch-depth: 0}
+      - name: Verify release commit is current main
+        run: |
+          git fetch --no-tags origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/main)" || {
+            echo 'release tag must point to the current main commit' >&2
+            exit 1
+          }
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with: {go-version: 1.26.5, cache: true}
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-yaml shellcheck
+      - run: ./scripts/check-release-readiness.sh
+      - name: Formatting
+        run: make fmt
+      - name: Go vet
+        run: make vet
+      - name: Race tests and coverage
+        run: make test
+      - name: Privacy and secret scan
+        run: make privacy-scan
+      - name: OCI, attestation, and vulnerability policy tests
+        run: make policy-test
+      - name: Runtime budget policy tests
+        run: make runtime-budget-test
+      - name: Release tooling tests
+        run: make release-tools-test
+      - name: Repository and workflow policy
+        run: make repository-test
+      - name: Native and Linux arm64 builds
+        run: make validate-build
+      - name: ShellCheck
+        run: shellcheck scripts/*.sh
+  publish:
+    needs: verify
+    if: ${{ vars.TOROUTE_RELEASES_ENABLED == 'true' && needs.verify.result == 'success' }}
+    permissions: {contents: write, packages: write}
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {fetch-depth: 0}
+      - id: buildmeta
+        run: echo "date=$(git show -s --format=%cI HEAD)" >>"$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}'}
+      - name: Detect Docker Hub publishing
+        id: dockerhub
+        shell: bash
+        env:
+          USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          TOKEN_CONFIGURED: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        run: |
+          set -Eeuo pipefail
+          enabled=false; username=""
+          if [[ -n $USERNAME || $TOKEN_CONFIGURED == true ]]; then
+            [[ -n $USERNAME && $TOKEN_CONFIGURED == true ]] || { echo 'Docker Hub requires both username and token' >&2; exit 1; }
+            username=${USERNAME,,}
+            [[ $username =~ ^[a-z0-9][a-z0-9_-]{0,29}$ ]] || { echo 'unsupported Docker Hub username syntax' >&2; exit 1; }
+            enabled=true
+          fi
+          echo "enabled=$enabled" >>"$GITHUB_OUTPUT"
+          echo "username=$username" >>"$GITHUB_OUTPUT"
+      - if: ${{ steps.dockerhub.outputs.enabled == 'true' }}
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with: {username: '${{ steps.dockerhub.outputs.username }}', password: '${{ secrets.DOCKERHUB_TOKEN }}'}
+      - name: Resolve references
+        id: refs
+        shell: bash
+        env:
+          DOCKERHUB_ENABLED: ${{ steps.dockerhub.outputs.enabled }}
+          DOCKERHUB_USERNAME: ${{ steps.dockerhub.outputs.username }}
+        run: |
+          set -Eeuo pipefail
+          version=${GITHUB_REF_NAME#v}; prerelease=false; [[ $version == *-* ]] && prerelease=true
+          suffix="candidate-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          ghcr="ghcr.io/${GITHUB_REPOSITORY,,}"; ghcr_candidate="$ghcr:$suffix"; ghcr_exact="$ghcr:$version"
+          candidates=("$ghcr_candidate")
+          docker_candidate=""; docker_exact=""
+          if [[ $DOCKERHUB_ENABLED == true ]]; then
+            docker="${DOCKERHUB_USERNAME}/toroute"; docker_candidate="$docker:$suffix"; docker_exact="$docker:$version"; candidates+=("$docker_candidate")
+          fi
+          {
+            echo "version=$version"; echo "prerelease=$prerelease"; echo "ghcr_candidate=$ghcr_candidate"; echo "ghcr_exact=$ghcr_exact"
+            echo "docker_candidate=$docker_candidate"; echo "docker_exact=$docker_exact"
+            echo 'candidates<<EOF'; printf '%s\n' "${candidates[@]}"; echo EOF
+          } >>"$GITHUB_OUTPUT"
+      - name: Prove exact tags are unused
+        shell: bash
+        env:
+          GHCR_EXACT: ${{ steps.refs.outputs.ghcr_exact }}
+          DOCKER_EXACT: ${{ steps.refs.outputs.docker_exact }}
+        run: |
+          set -Eeuo pipefail
+          prove_absent(){ local ref=$1 out rc; set +e; out=$(docker buildx imagetools inspect "$ref" 2>&1); rc=$?; set -e; (( rc != 0 )) || { echo "refusing to overwrite $ref" >&2; exit 1; }; grep -qiE 'manifest unknown|name unknown|no such manifest|not_found:' <<<"$out" || { echo "unable to prove $ref is absent" >&2; printf '%s\n' "$out" >&2; exit 1; }; }
+          prove_absent "$GHCR_EXACT"; [[ -z $DOCKER_EXACT ]] || prove_absent "$DOCKER_EXACT"
+      - name: Build and push one candidate to all configured registries
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          pull: true
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.refs.outputs.candidates }}
+          build-args: |
+            VERSION=${{ steps.refs.outputs.version }}
+            COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ steps.buildmeta.outputs.date }}
+            SOURCE=https://github.com/${{ github.repository }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Resolve registry-local candidate identities
+        id: identities
+        shell: bash
+        env:
+          GHCR: ${{ steps.refs.outputs.ghcr_candidate }}
+          DOCKER: ${{ steps.refs.outputs.docker_candidate }}
+        run: |
+          set -Eeuo pipefail; mkdir -p release-evidence
+          inspect(){
+            local name=$1 ref=$2 summary="release-evidence/${name}-inspect.txt" raw="release-evidence/${name}-index.json" digest attempt
+            for attempt in {1..10}; do
+              if docker buildx imagetools inspect "$ref" >"$summary" 2>&1; then break; fi
+              (( attempt < 10 )) || { cat "$summary" >&2; exit 1; }
+              sleep 6
+            done
+            digest=$(awk '$1=="Digest:"{print $2;exit}' "$summary")
+            [[ $digest =~ ^sha256:[0-9a-f]{64}$ ]] || { cat "$summary" >&2; exit 1; }
+            for attempt in {1..10}; do
+              if docker buildx imagetools inspect "$ref@$digest" --raw >"$raw"; then break; fi
+              (( attempt < 10 )) || exit 1
+              sleep 6
+            done
+            python3 scripts/manifest-identity.py <"$raw" >"release-evidence/${name}-platforms.json"
+            echo "$digest"
+          }
+          ghcr_digest=$(inspect ghcr "$GHCR"); echo "ghcr_digest=$ghcr_digest" >>"$GITHUB_OUTPUT"
+          if [[ -n $DOCKER ]]; then docker_digest=$(inspect dockerhub "$DOCKER"); diff -u release-evidence/ghcr-platforms.json release-evidence/dockerhub-platforms.json; else docker_digest=""; fi
+          echo "docker_digest=$docker_digest" >>"$GITHUB_OUTPUT"
+      - name: Extract and validate candidate SBOM and provenance
+        env:
+          IMAGE: ${{ steps.refs.outputs.ghcr_candidate }}
+          DIGEST: ${{ steps.identities.outputs.ghcr_digest }}
+        run: |
+          set -Eeuo pipefail
+          ref="$IMAGE@$DIGEST"
+          docker buildx imagetools inspect "$ref" --format '{{ json (index .SBOM "linux/amd64").SPDX }}' >release-evidence/sbom-amd64.json
+          docker buildx imagetools inspect "$ref" --format '{{ json (index .SBOM "linux/arm64").SPDX }}' >release-evidence/sbom-arm64.json
+          docker buildx imagetools inspect "$ref" --format '{{ json (index .Provenance "linux/amd64").SLSA }}' >release-evidence/provenance-amd64.json
+          docker buildx imagetools inspect "$ref" --format '{{ json (index .Provenance "linux/arm64").SLSA }}' >release-evidence/provenance-arm64.json
+          python3 scripts/validate-attestation-data.py \
+            --sbom-amd64 release-evidence/sbom-amd64.json \
+            --sbom-arm64 release-evidence/sbom-arm64.json \
+            --provenance-amd64 release-evidence/provenance-amd64.json \
+            --provenance-arm64 release-evidence/provenance-arm64.json \
+            --summary release-evidence/attestation-summary.json
+      - name: Validate exact amd64 candidate configuration
+        env: {DOCKER_PLATFORM: linux/amd64}
+        run: ./scripts/docker-config-test.sh '${{ steps.refs.outputs.ghcr_candidate }}@${{ steps.identities.outputs.ghcr_digest }}'
+      - name: Record exact amd64 image footprint and package inventory
+        env:
+          IMAGE: ${{ steps.refs.outputs.ghcr_candidate }}@${{ steps.identities.outputs.ghcr_digest }}
+          DOCKER_DEFAULT_PLATFORM: linux/amd64
+        run: ./scripts/image-inventory.sh "$IMAGE" release-evidence/image-inventory-amd64.json
+      - name: Validate exact amd64 candidate live Tor paths and runtime budget
+        env:
+          LIVE_TIMEOUT_SECONDS: '360'
+          LIVE_METRICS_OUTPUT: release-evidence/runtime-metrics-amd64.json
+          RUNTIME_SAMPLE_SECONDS: '10'
+        run: ./scripts/live-smoke.sh '${{ steps.refs.outputs.ghcr_candidate }}@${{ steps.identities.outputs.ghcr_digest }}'
+      - name: Validate exact arm64 candidate configuration under QEMU
+        env: {DOCKER_PLATFORM: linux/arm64}
+        run: ./scripts/docker-config-test.sh '${{ steps.refs.outputs.ghcr_candidate }}@${{ steps.identities.outputs.ghcr_digest }}'
+      - name: Scan amd64 candidate
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.72.0
+          image-ref: '${{ steps.refs.outputs.ghcr_candidate }}@${{ steps.identities.outputs.ghcr_digest }}'
+          format: json
+          output: release-evidence/trivy-amd64.json
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '0'
+          trivy-args: --platform linux/amd64
+      - name: Scan arm64 candidate
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.72.0
+          image-ref: '${{ steps.refs.outputs.ghcr_candidate }}@${{ steps.identities.outputs.ghcr_digest }}'
+          format: json
+          output: release-evidence/trivy-arm64.json
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '0'
+          trivy-args: --platform linux/arm64
+      - name: Enforce vulnerability policy
+        run: |
+          python3 scripts/check-vulnerabilities.py \
+            --report linux/amd64=release-evidence/trivy-amd64.json \
+            --report linux/arm64=release-evidence/trivy-arm64.json \
+            --evidence release-evidence/vulnerability-policy.json
+      - name: Package source and candidate evidence
+        env:
+          VERSION: ${{ steps.refs.outputs.version }}
+          GHCR_DIGEST: ${{ steps.identities.outputs.ghcr_digest }}
+          DOCKER_DIGEST: ${{ steps.identities.outputs.docker_digest }}
+        run: |
+          ./scripts/package-source.sh "$VERSION" release
+          python3 - <<'PY'
+          import json,os
+          data={'version':os.environ['VERSION'],'source_commit':os.environ['GITHUB_SHA'],'ghcr_candidate_digest':os.environ['GHCR_DIGEST']}
+          if os.environ.get('DOCKER_DIGEST'): data['dockerhub_candidate_digest']=os.environ['DOCKER_DIGEST']
+          open('release/release-manifest.json','w').write(json.dumps(data,indent=2,sort_keys=True)+'\n')
+          PY
+          tar --sort=name --owner=0 --group=0 --numeric-owner             -czf release/candidate-evidence.tar.gz release-evidence
+          (cd release && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum >SHA256SUMS)
+      - name: Create or verify draft Release
+        env: {GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}', PRE: '${{ steps.refs.outputs.prerelease }}'}
+        run: |
+          set -Eeuo pipefail; set +e; state=$(gh release view "$GITHUB_REF_NAME" --json isDraft,isPrerelease --jq '[.isDraft,.isPrerelease]|@tsv' 2>&1); rc=$?; set -e
+          if (( rc==0 )); then IFS=$'\t' read -r draft pre <<<"$state"; [[ $draft == true && $pre == "$PRE" ]] || exit 1
+          elif grep -qiE 'release not found|HTTP 404' <<<"$state"; then args=("$GITHUB_REF_NAME" --verify-tag --draft --generate-notes --title "$GITHUB_REF_NAME"); [[ $PRE == true ]] && args+=(--prerelease --latest=false); gh release create "${args[@]}"
+          else printf '%s\n' "$state" >&2; exit 1; fi
+          gh release upload "$GITHUB_REF_NAME" release/* --clobber
+      - name: Promote exact tags within each registry
+        env:
+          GHCR_CANDIDATE: ${{ steps.refs.outputs.ghcr_candidate }}
+          GHCR_DIGEST: ${{ steps.identities.outputs.ghcr_digest }}
+          GHCR_EXACT: ${{ steps.refs.outputs.ghcr_exact }}
+          DOCKER_CANDIDATE: ${{ steps.refs.outputs.docker_candidate }}
+          DOCKER_DIGEST: ${{ steps.identities.outputs.docker_digest }}
+          DOCKER_EXACT: ${{ steps.refs.outputs.docker_exact }}
+        run: |
+          set -Eeuo pipefail
+          docker buildx imagetools create --tag "$GHCR_EXACT" "$GHCR_CANDIDATE@$GHCR_DIGEST"
+          [[ -z $DOCKER_EXACT ]] || docker buildx imagetools create --tag "$DOCKER_EXACT" "$DOCKER_CANDIDATE@$DOCKER_DIGEST"
+      - name: Verify exact tags and update stable aliases
+        env:
+          VERSION: ${{ steps.refs.outputs.version }}
+          PRE: ${{ steps.refs.outputs.prerelease }}
+          GHCR_EXACT: ${{ steps.refs.outputs.ghcr_exact }}
+          GHCR_CANDIDATE: ${{ steps.refs.outputs.ghcr_candidate }}
+          GHCR_DIGEST: ${{ steps.identities.outputs.ghcr_digest }}
+          DOCKER_EXACT: ${{ steps.refs.outputs.docker_exact }}
+          DOCKER_CANDIDATE: ${{ steps.refs.outputs.docker_candidate }}
+          DOCKER_DIGEST: ${{ steps.identities.outputs.docker_digest }}
+        run: |
+          set -Eeuo pipefail
+          verify(){
+            local ref=$1 out=$2 attempt
+            for attempt in {1..10}; do
+              if docker buildx imagetools inspect "$ref" --raw >"$out"; then
+                python3 scripts/manifest-identity.py <"$out" >"$out.platforms"
+                diff -u release-evidence/ghcr-platforms.json "$out.platforms"
+                return 0
+              fi
+              (( attempt < 10 )) && sleep 6
+            done
+            echo "published tag did not become readable: $ref" >&2
+            return 1
+          }
+          verify "$GHCR_EXACT" release-evidence/ghcr-exact.json
+          [[ -z $DOCKER_EXACT ]] || verify "$DOCKER_EXACT" release-evidence/docker-exact.json
+          if [[ $PRE != true ]]; then
+            IFS=. read -r major minor patch <<<"$VERSION"
+            ghcr_base=${GHCR_EXACT%:*}
+            alias_number=0
+            for tag in "$major.$minor" "$major" latest; do
+              alias_number=$((alias_number+1))
+              ref="$ghcr_base:$tag"
+              docker buildx imagetools create --tag "$ref" "$GHCR_CANDIDATE@$GHCR_DIGEST"
+              verify "$ref" "release-evidence/ghcr-alias-${alias_number}.json"
+            done
+            if [[ -n $DOCKER_EXACT ]]; then
+              docker_base=${DOCKER_EXACT%:*}
+              alias_number=0
+              for tag in "$major.$minor" "$major" latest; do
+                alias_number=$((alias_number+1))
+                ref="$docker_base:$tag"
+                docker buildx imagetools create --tag "$ref" "$DOCKER_CANDIDATE@$DOCKER_DIGEST"
+                verify "$ref" "release-evidence/docker-alias-${alias_number}.json"
+              done
+            fi
+          fi
+      - name: Verify anonymous public tags and candidate identity
+        env:
+          VERSION: ${{ steps.refs.outputs.version }}
+          PRE: ${{ steps.refs.outputs.prerelease }}
+          GHCR_IMAGE: ${{ steps.refs.outputs.ghcr_exact }}
+          DOCKER_IMAGE: ${{ steps.refs.outputs.docker_exact }}
+        run: |
+          set -Eeuo pipefail
+          anonymous=$(mktemp -d)
+          trap 'rm -rf "$anonymous"' EXIT
+          verify_anonymous(){
+            local name=$1 ref=$2 raw="release-evidence/anonymous-${name}.json"
+            for attempt in {1..10}; do
+              if DOCKER_CONFIG="$anonymous" docker buildx imagetools inspect "$ref" --raw >"$raw"; then
+                python3 scripts/manifest-identity.py <"$raw" >"$raw.platforms"
+                diff -u release-evidence/ghcr-platforms.json "$raw.platforms"
+                return 0
+              fi
+              (( attempt < 10 )) && sleep 6
+            done
+            echo "$ref is not anonymously readable" >&2
+            return 1
+          }
+          verify_anonymous ghcr-exact "$GHCR_IMAGE"
+          [[ -z $DOCKER_IMAGE ]] || verify_anonymous dockerhub-exact "$DOCKER_IMAGE"
+          if [[ $PRE != true ]]; then
+            IFS=. read -r major minor patch <<<"$VERSION"
+            ghcr_base=${GHCR_IMAGE%:*}
+            verify_anonymous ghcr-minor "$ghcr_base:$major.$minor"
+            verify_anonymous ghcr-major "$ghcr_base:$major"
+            verify_anonymous ghcr-latest "$ghcr_base:latest"
+            if [[ -n $DOCKER_IMAGE ]]; then
+              docker_base=${DOCKER_IMAGE%:*}
+              verify_anonymous dockerhub-minor "$docker_base:$major.$minor"
+              verify_anonymous dockerhub-major "$docker_base:$major"
+              verify_anonymous dockerhub-latest "$docker_base:latest"
+            fi
+          fi
+      - name: Upload final evidence and publish Release
+        env: {GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}', PRE: '${{ steps.refs.outputs.prerelease }}'}
+        run: |
+          tar -czf release/final-publication-evidence.tar.gz release-evidence
+          (cd release && sha256sum final-publication-evidence.tar.gz >>SHA256SUMS)
+          gh release upload "$GITHUB_REF_NAME" release/final-publication-evidence.tar.gz release/SHA256SUMS --clobber
+          args=("$GITHUB_REF_NAME" --draft=false); [[ $PRE == true ]] && args+=(--prerelease --latest=false); gh release edit "${args[@]}"

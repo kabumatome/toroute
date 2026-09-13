@@ -1,0 +1,21 @@
+services:
+  toroute:
+    image: ${TOROUTE_TEST_IMAGE:-toroute:ci}
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /run/toroute:uid=65532,gid=65532,mode=0700
+      - /var/lib/toroute:uid=65532,gid=65532,mode=0700
+    networks:
+      client: {}
+      egress:
+        gw_priority: 1
+  egress-target:
+    image: ${TOROUTE_PROBE_IMAGE:-toroute-netprobe:ci}
+    command: ["--listen", ":8080"]
+    networks: [egress]
+networks:
+  client:
+    internal: true
+  egress: {}

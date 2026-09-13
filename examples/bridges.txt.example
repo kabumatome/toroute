@@ -1,0 +1,3 @@
+# Obtain current lines from an official bridge distribution channel.
+# Never commit real bridge lines to a public repository.
+# obfs4 192.0.2.10:443 0123456789ABCDEF0123456789ABCDEF01234567 cert=REPLACE_ME iat-mode=0

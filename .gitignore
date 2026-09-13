@@ -1,0 +1,17 @@
+/bin/
+/release/
+/coverage.out
+*.test
+*.prof
+*.zip
+*.tar.gz
+*.sha256
+.env
+bridges.txt
+.DS_Store
+__pycache__/
+*.pyc
+validation-results/
+.tmp-validation/
+
+/SOURCE_METADATA.json

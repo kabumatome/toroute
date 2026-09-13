@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/kabumatome/toroute/security/advisories/new
+    about: Report security issues privately.
+  - name: Support policy
+    url: https://github.com/kabumatome/toroute/blob/main/SUPPORT.md
+    about: Review supported and unsupported use cases before filing.

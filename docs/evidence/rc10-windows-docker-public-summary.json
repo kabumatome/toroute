@@ -1,0 +1,121 @@
+{
+  "evidence_profile": "windows-docker-full",
+  "generated_at_utc": "2026-09-13T10:01:07.1782241Z",
+  "project": "ToRoute",
+  "publication": {
+    "raw_evidence_publishable": false,
+    "this_summary_contains_raw_operational_data": false
+  },
+  "release_gate_eligible": false,
+  "runtime_budget": {
+    "metrics": {
+      "bootstrap_milliseconds": {
+        "limit": 180000,
+        "observed": 43854,
+        "passed": true
+      },
+      "idle_cpu_usec_per_second": {
+        "limit": 50000,
+        "observed": 31557,
+        "passed": true
+      },
+      "image_size_bytes": {
+        "limit": 180000000,
+        "observed": 140801992,
+        "passed": true
+      },
+      "package_count": {
+        "limit": 115,
+        "observed": 101,
+        "passed": true
+      },
+      "pids_max": {
+        "limit": 48,
+        "observed": 28,
+        "passed": true
+      },
+      "steady_memory_max_bytes": {
+        "limit": 230686720,
+        "observed": 136544256,
+        "passed": true
+      }
+    },
+    "passed": true,
+    "profile": "full-http"
+  },
+  "schema_version": 1,
+  "source": {
+    "evidence_consistent": true,
+    "identity_verified": false,
+    "revision": null,
+    "status": "unverified-non-commit"
+  },
+  "toroute_version": "0.4.0-rc.10",
+  "validation": {
+    "arm64_requested": true,
+    "checks": [
+      {
+        "elapsed_seconds": 0.441,
+        "name": "Windows PowerShell runtime self-test",
+        "status": "passed"
+      },
+      {
+        "elapsed_seconds": 1.187,
+        "name": "Docker Desktop / Compose / Buildx前提確認",
+        "status": "passed"
+      },
+      {
+        "elapsed_seconds": 39.528,
+        "name": "amd64 runtime / netprobe / proxycheckビルド",
+        "status": "passed"
+      },
+      {
+        "elapsed_seconds": 5.005,
+        "name": "イメージmetadata・non-root・設定境界",
+        "status": "passed"
+      },
+      {
+        "elapsed_seconds": 44.686,
+        "name": "hardened Compose起動・readiness",
+        "status": "passed"
+      },
+      {
+        "elapsed_seconds": 1.903,
+        "name": "client network直通防止・proxy到達",
+        "status": "passed"
+      },
+      {
+        "elapsed_seconds": 4.765,
+        "name": "SOCKS5 remote DNS・Tor実通信",
+        "status": "passed"
+      },
+      {
+        "elapsed_seconds": 5.937,
+        "name": "HTTP CONNECT・Tor実通信",
+        "status": "passed"
+      },
+      {
+        "elapsed_seconds": 2.359,
+        "name": "NEWNYM・Control往復",
+        "status": "passed"
+      },
+      {
+        "elapsed_seconds": 13.811,
+        "name": "runtime metrics・package inventory",
+        "status": "passed"
+      },
+      {
+        "elapsed_seconds": 0.112,
+        "name": "ログ秘密情報・異常文字列監査",
+        "status": "passed"
+      },
+      {
+        "elapsed_seconds": 55.566,
+        "name": "arm64 QEMU build・config validation",
+        "status": "passed"
+      }
+    ],
+    "quick_mode": false,
+    "succeeded": true
+  }
+}

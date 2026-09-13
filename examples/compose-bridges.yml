@@ -1,0 +1,44 @@
+# Set TOROUTE_BRIDGES_SOURCE to an absolute path outside this repository.
+# Always stop this stack with: docker compose -f examples/compose-bridges.yml down -v
+services:
+  bridge-secret-init:
+    image: ${TOROUTE_IMAGE:-ghcr.io/kabumatome/toroute:1.0.0}
+    user: "0:0"
+    network_mode: none
+    read_only: true
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 32
+    secrets: [bridge-source]
+    volumes:
+      - bridge-secret:/secure
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - "umask 077; cat /run/secrets/bridge-source > /secure/bridges; chmod 0600 /secure/bridges; chown 65532:65532 /secure/bridges"
+    restart: "no"
+
+  toroute:
+    image: ${TOROUTE_IMAGE:-ghcr.io/kabumatome/toroute:1.0.0}
+    depends_on:
+      bridge-secret-init:
+        condition: service_completed_successfully
+    environment:
+      TOROUTE_BRIDGES_FILE: /run/bridge-input/bridges
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
+    tmpfs:
+      - /run/toroute:uid=65532,gid=65532,mode=0700
+    volumes:
+      - toroute-data:/var/lib/toroute
+      - bridge-secret:/run/bridge-input:ro
+
+secrets:
+  bridge-source:
+    file: ${TOROUTE_BRIDGES_SOURCE:?set an absolute Bridge file path outside the repository}
+
+volumes:
+  toroute-data: {}
+  bridge-secret: {}

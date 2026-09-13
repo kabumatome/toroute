@@ -1,0 +1,3 @@
+AvoidDiskWrites 1
+MaxCircuitDirtiness 600
+ConnectionPadding auto

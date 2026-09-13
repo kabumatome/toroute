@@ -1,0 +1,169 @@
+name: CI
+on:
+  workflow_dispatch:
+  pull_request:
+    paths-ignore: ['**/*.md']
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md']
+permissions: {}
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source:
+    permissions: {contents: read}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [1.23.x, 1.26.5]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with: {go-version: '${{ matrix.go-version }}', cache: true}
+      - name: Formatting
+        run: make fmt
+      - name: Go vet
+        run: make vet
+      - name: Race tests and coverage
+        run: make test
+      - name: Native build
+        run: make build
+      - name: Linux arm64 cross-build
+        if: ${{ matrix.go-version == '1.26.5' }}
+        run: make cross-build
+  policy:
+    permissions: {contents: read}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with: {go-version: 1.26.5, cache: true}
+      - name: Install validation tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-yaml shellcheck
+      - name: Privacy and secret scan
+        run: make privacy-scan
+      - name: OCI, attestation, and vulnerability policy tests
+        run: make policy-test
+      - name: Runtime budget policy tests
+        run: make runtime-budget-test
+      - name: Release tooling tests
+        run: make release-tools-test
+      - name: Repository and workflow policy
+        run: make repository-test
+      - name: ShellCheck
+        run: shellcheck scripts/*.sh
+  windows-launcher:
+    permissions: {contents: read}
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run launcher parse-only path with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $env:TOROUTE_PARSE_ONLY = '1'
+          cmd.exe /d /c RUN_DOCKER_VALIDATION.cmd
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run archive-mode runtime self-test with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $archiveRoot = Join-Path $env:RUNNER_TEMP 'toroute-source-archive'
+          Remove-Item -LiteralPath $archiveRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $archiveRoot | Out-Null
+          robocopy . $archiveRoot /E /XD .git validation-results bin release /XF coverage.out *.zip *.tar.gz | Out-Null
+          $copyExit = $LASTEXITCODE
+          if ($copyExit -ge 8) { throw "robocopy failed with exit code $copyExit" }
+          Remove-Item -LiteralPath (Join-Path $archiveRoot '.git') -Recurse -Force -ErrorAction SilentlyContinue
+          $sourceCommit = (git rev-parse HEAD).Trim()
+          $sourceEpoch = [int64](git show -s --format=%ct HEAD)
+          $changelog = Get-Content -LiteralPath CHANGELOG.md -Raw
+          $versionMatch = [regex]::Match($changelog, '(?m)^##\s+(\d+\.\d+\.\d+-rc\.\d+)\b')
+          if (-not $versionMatch.Success) { throw 'Unable to read RC version from CHANGELOG.md' }
+          [ordered]@{
+            schema_version = 1
+            project = 'ToRoute'
+            version = $versionMatch.Groups[1].Value
+            source_commit = $sourceCommit
+            source_date_epoch = $sourceEpoch
+          } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $archiveRoot 'SOURCE_METADATA.json') -Encoding UTF8
+          Push-Location $archiveRoot
+          try {
+              cmd.exe /d /c RUN_DOCKER_VALIDATION.cmd -PreflightOnly
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          finally {
+            Pop-Location
+          }
+      - name: Parse validation script with PowerShell 7
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'tools/windows/Run-ToRoute-Docker-Validation.ps1'),
+            [ref]$tokens,
+            [ref]$errors
+          )
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.ToString() }
+            exit 1
+          }
+  docker:
+    needs: [source, policy, windows-launcher]
+    permissions: {contents: read}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: buildmeta
+        run: echo "date=$(git show -s --format=%cI HEAD)" >>"$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Validate Compose model
+        run: docker compose -f compose.yml config --quiet
+      - name: Build amd64 test image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          pull: true
+          load: true
+          platforms: linux/amd64
+          tags: toroute:ci
+          build-args: |
+            VERSION=ci-${{ github.sha }}
+            COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ steps.buildmeta.outputs.date }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build network probe
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          target: netprobe
+          load: true
+          tags: toroute-netprobe:ci
+          cache-from: type=gha
+      - name: Build proxy validation client
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          target: proxycheck
+          load: true
+          tags: toroute-proxycheck:ci
+          cache-from: type=gha
+      - name: Execute proxy validation image
+        run: docker run --rm toroute-proxycheck:ci --help >/dev/null
+      - run: ./scripts/docker-config-test.sh toroute:ci
+      - run: ./scripts/compose-network-test.sh toroute:ci toroute-netprobe:ci
+      - name: Record image footprint and package inventory
+        run: ./scripts/image-inventory.sh toroute:ci ci-image-inventory.json
+      - name: Upload image inventory
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-image-inventory-${{ github.sha }}
+          path: ci-image-inventory.json
+          if-no-files-found: error
+          retention-days: 14

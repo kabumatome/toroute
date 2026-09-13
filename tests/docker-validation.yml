@@ -1,0 +1,31 @@
+services:
+  toroute:
+    image: ${TOROUTE_TEST_IMAGE:-toroute:validation-amd64}
+    environment:
+      TOROUTE_HTTP_ENABLED: "true"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
+    tmpfs:
+      - /run/toroute:uid=65532,gid=65532,mode=0700
+      - /var/lib/toroute:uid=65532,gid=65532,mode=0700
+    networks:
+      client: {}
+      egress:
+        gw_priority: 1
+
+  egress-target:
+    image: ${TOROUTE_NETPROBE_IMAGE:-toroute-netprobe:validation}
+    command: ["--listen", ":8080"]
+    networks: [egress]
+
+  proxycheck:
+    image: ${TOROUTE_PROXYCHECK_IMAGE:-toroute-proxycheck:validation}
+    profiles: ["tools"]
+    networks: [client]
+
+networks:
+  client:
+    internal: true
+  egress: {}

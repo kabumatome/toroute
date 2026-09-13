@@ -1,0 +1,18 @@
+services:
+  toroute:
+    image: ghcr.io/kabumatome/toroute:1.0.0
+    restart: unless-stopped
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /run/toroute:uid=65532,gid=65532,mode=0700
+    volumes:
+      - toroute-data:/var/lib/toroute
+    ports:
+      - "127.0.0.1:9050:9050"
+      - "127.0.0.1:8118:8118"
+    environment:
+      TOROUTE_HTTP_ENABLED: "true"
+volumes:
+  toroute-data: {}

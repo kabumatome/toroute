@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "profile": "full-http",
+  "source_version": "0.4.0-rc.8",
+  "source_commit": "e7d284614aec9b5ab8f7872dac8b9b080c38525d",
+  "evidence_date_utc": "2026-07-22",
+  "environment_family": "Docker Desktop Linux amd64",
+  "validation_checks_passed": 12,
+  "image_size_bytes": 140775431,
+  "package_count": 101,
+  "bootstrap_milliseconds": 17647,
+  "steady_memory_min_bytes": 149897216,
+  "steady_memory_median_bytes": 151982080,
+  "steady_memory_max_bytes": 152064000,
+  "idle_cpu_usec_per_second": 36056,
+  "pids_max": 28,
+  "notes": "Sanitized reviewed baseline. User paths, host identity, exit IPs, raw logs, image IDs, container IDs, and network IDs are intentionally omitted. CPU is a conservative 10-second sample after live SOCKS/HTTP and NEWNYM checks."
+}
