@@ -13,9 +13,9 @@ identity cannot be proven.
 
 ## Public release gate
 
-The repository remains private until a maintainer explicitly completes the
-public release gate. Before changing repository visibility or publishing a
-stable release, confirm all of the following:
+The source repository is public, but repository visibility alone is not a stable release.
+Before publishing a stable release or making release packages/tags public, confirm all of
+the following:
 
 - GitHub private vulnerability reporting is enabled.
 - Release immutability is enabled.

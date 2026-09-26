@@ -1,6 +1,7 @@
 # ToRoute 要件定義・設計・進捗状況
 
 作成日: 2026-07-23
+最終更新: 2026-09-26
 区分: 公開用技術資料
 
 ## 1. 最終目標
@@ -67,7 +68,7 @@ v1.0は、設定、実コンテナ、実通信、供給網、配布物が同時�
 | release／registry workflow | 87% | build-once設計、実registry待ち |
 | vulnerability／SBOM／provenance | 88% | policy完成、actual candidate待ち |
 | 文書／配布 | 95% | rc.8実証と復元来歴へ同期 |
-| 公開導入／独立review | 35% | Owner確定後の工程 |
+| 公開導入／独立review | 50% | repository公開済み、registry公開と独立review待ち |
 | **総合公開準備度** | **約91%** | **G2合格、G3準備中** |
 
 ## 5. 機能別進捗
@@ -110,7 +111,7 @@ active上限はimage 180 MB、packages 115、Bootstrap 180秒、memory 220 MiB�
 - G1 Source RC: 合格
 - G2 Container RC: rc.12 verified-commit全12項目・全budget成功で合格
 - G3 Release RC: actual Trivy／SBOM／provenance／registry rehearsal待ち
-- G4 Public v1.0: Owner設定、独立review、正式registry公開待ち
+- G4 Public v1.0: repository公開済み、独立review、正式registry公開待ち
 
 rc.9はTor直接readyとDocker health反映の同期、rc.10はWindows launcher、rc.11はBridge秘密ファイル・release誤操作・Actions費用制御、rc.12は証跡privacy／provenanceを対象とする。rc.12のverified-commit再実証で全変更のWindows Docker回帰を確認した。
 
@@ -120,7 +121,7 @@ rc.9はTor直接readyとDocker health反映の同期、rc.10はWindows launcher�
 2. actual SPDX SBOM／SLSA provenance
 3. GHCR／Docker Hub single-candidate promotion rehearsal
 4. anonymous exact／alias pullとplatform identity
-5. GitHub Actions／CodeQL／ShellCheck／actionlint
+5. GitHub Actions上でCI／CodeQL／ShellCheck／actionlintを成功させる
 6. independent security review
 
 Bridge liveは実Bridge秘密情報を必要とする任意補助gateとして継続する。秘密情報stagingの異常系、arm64 live、actual child failure testは2026-09-13のローカルDocker実証で合格した。
@@ -138,7 +139,7 @@ releaseの明示enableとcurrent-main検査、追跡中の古い`SOURCE_METADATA
 
 rc.12 verified-commit Windows Docker回帰は完了した。技術完成の残ゲートはactual amd64／arm64
 vulnerability、SPDX／SLSA、registry rehearsal、GitHub静的解析、独立security reviewである。
-repository公開、GHCR公開、stable tag作成は所有者の明示判断なしに実行しない。
+repositoryは公開済み。GHCR公開、stable tag作成は所有者の明示判断なしに実行しない。
 
 
 ## 11. 2026-09-13 実証証跡監査
@@ -157,3 +158,11 @@ commit `09340692f842bfccd34b3b8f38b4d1ee25a5ef21`で全12項目と全active
 runtime budgetが成功した。source identityとOCI version／revision labelは一致し、
 sanitized public summaryは`release_gate_eligible=true`である。生ZIPは利用者path、
 host情報、local ID、Tor exit IPを含むため公開しない。
+
+
+## 13. 2026-09-26 公開後監査
+
+公開repositoryの実態へ文書を同期し、docsをcore／validation／release／history／referencesへ分離した。
+同時にrepository policyの旧docs path依存を修復し、actionlintをCI・bootstrap・releaseの必須gateへ
+追加した。CodeQL workflow自身の変更もCodeQL実行対象とし、GitHub上の静的解析をG3/G4の
+実証対象として明確化した。

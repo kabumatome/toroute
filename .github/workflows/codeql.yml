@@ -2,10 +2,10 @@ name: CodeQL
 on:
   workflow_dispatch:
   pull_request:
-    paths: ['**/*.go', 'go.mod']
+    paths: ['**/*.go', 'go.mod', '.github/workflows/codeql.yml']
   push:
     branches: [main]
-    paths: ['**/*.go', 'go.mod']
+    paths: ['**/*.go', 'go.mod', '.github/workflows/codeql.yml']
 permissions: {}
 jobs:
   analyze:

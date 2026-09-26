@@ -44,6 +44,10 @@ jobs:
         with: {go-version: 1.26.5, cache: true}
       - name: Install validation tools
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-yaml shellcheck
+      - name: Install actionlint
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          echo "$(go env GOPATH)/bin" >>"$GITHUB_PATH"
       - name: Privacy and secret scan
         run: make privacy-scan
       - name: OCI, attestation, and vulnerability policy tests
@@ -54,6 +58,8 @@ jobs:
         run: make release-tools-test
       - name: Repository and workflow policy
         run: make repository-test
+      - name: Actionlint
+        run: actionlint
       - name: ShellCheck
         run: shellcheck scripts/*.sh
   windows-launcher:

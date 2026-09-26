@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — v1.0 release-gate hardening
+
+- Reorganize documentation into current design, validation, release, history, evidence, and reference areas with one maintained index.
+- Repair repository-policy checks after the documentation move and enforce the new docs-root structure.
+- Add pinned actionlint v1.7.12 to CI, GHCR bootstrap, and release verification gates.
+- Make CodeQL workflow changes trigger CodeQL analysis so its own policy cannot silently drift.
+- Synchronize release documentation with the repository's current public visibility while keeping registry publication and stable tags explicitly gated.
+
+
 ## 0.4.0-rc.12 — evidence provenance and public-summary hardening
 
 - Fail Windows validation when neither a Git commit nor valid packaged `SOURCE_METADATA.json` can identify the source.
