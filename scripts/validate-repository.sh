@@ -48,7 +48,7 @@ if grep -RInE --binary-files=without-match --exclude-dir=.git --exclude-dir=bin 
 fi
 # Historical product references are permitted only in migration/source documentation.
 if grep -RIl --binary-files=without-match --exclude-dir=.git --exclude-dir=bin --exclude-dir=release --exclude-dir=.tmp-validation --exclude='validate-repository.sh' \
-  'dperson/torproxy' . | grep -Ev '^(./docs/core/(MIGRATION_DPERSON|REQUIREMENTS_AND_DESIGN_JA)\.md|./docs/references/SOURCES\.md|./docs/history/RECOVERY_REPORT_JA\.md|./docs/release/BASE_IMAGE_DECISION\.md|./README(\.ja)?\.md|./NOTICE)
+  'dperson/torproxy' . | grep -Ev '^(./docs/core/(MIGRATION_DPERSON|REQUIREMENTS_AND_DESIGN_JA)\.md|./docs/references/SOURCES\.md|./docs/history/RECOVERY_REPORT_JA\.md|./docs/release/BASE_IMAGE_DECISION\.md|./README(\.ja)?\.md|./NOTICE)$'; then
   echo 'dperson/torproxy reference exists outside approved migration documentation' >&2
   exit 1
 fi
