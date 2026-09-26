@@ -75,7 +75,7 @@ With Docker Desktop running, execute the following from the extracted source roo
 0.4.0-rc.10 relaunches Explorer double-clicks into a persistent `cmd.exe /k` console. It records pre-PowerShell startup diagnostics in `validation-results\launcher-bootstrap.log` and parser/runtime diagnostics in `validation-results\last-launch.log`.
 0.4.0-rc.5 fixed `check-config` under a read-only root filesystem. 0.4.0-rc.6 activated runtime/package budgets and reduced the runtime dependency set. 0.4.0-rc.8 completed all 12 Container RC checks and replaced shell-based cgroup evidence collection with direct file reads. rc.9 only synchronizes Docker health-state propagation after direct Tor readiness.
 
-See [the Japanese Windows validation guide](docs/DOCKER_VALIDATION_WINDOWS_JA.md).
+See [the Japanese Windows validation guide](docs/validation/DOCKER_VALIDATION_WINDOWS_JA.md).
 
 ## Runtime base and lightweight roadmap
 
@@ -90,7 +90,7 @@ Alpine remains a formal post-v1.0 experiment. It must retain full feature
 parity and pass the same amd64/arm64, Bridge, live Tor, vulnerability,
 SBOM/provenance, and release-identity gates. Release candidates record image
 size, bootstrap time, steady memory, PID count, and idle CPU as JSON evidence.
-See [the base-image decision](docs/BASE_IMAGE_DECISION.md).
+See [the base-image decision](docs/release/BASE_IMAGE_DECISION.md).
 
 ## CLI
 
@@ -134,8 +134,12 @@ SOCKS5 remote DNS, HTTP CONNECT, SAFECOOKIE/NEWNYM, runtime metrics, log scannin
 and arm64 QEMU configuration. Actual registry, Trivy, SBOM/provenance, and public
 pull gates remain pending.
 
-See [the Container RC evidence](docs/CONTAINER_RC_EVIDENCE_JA.md) and
-[the Japanese requirements/design/progress report](docs/REQUIREMENTS_AND_DESIGN_JA.md).
+See [the Container RC evidence](docs/history/CONTAINER_RC_EVIDENCE_JA.md) and
+[the Japanese requirements/design/progress report](docs/core/REQUIREMENTS_AND_DESIGN_JA.md).
 
 For the remaining developer-machine full validation gate, see
-[the local full validation runbook](docs/LOCAL_FULL_VALIDATION_JA.md).
+[the local full validation runbook](docs/validation/LOCAL_FULL_VALIDATION_JA.md).
+
+## Documentation
+
+Start with the [documentation index](docs/README.md) for architecture, configuration, validation, release, historical evidence, and primary references.

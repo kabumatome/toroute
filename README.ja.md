@@ -75,7 +75,7 @@ Docker Desktopを起動し、展開したSource RCのルートで次を実行す
 
 既定ではamd64 build、設定境界、non-root/read-only/capability、Compose直通防止、SOCKS5 remote DNS、HTTP CONNECT、Tor判定、NEWNYM、runtime計測、ログ監査、arm64 QEMUを確認します。結果は`validation-results`に保存されます。
 
-詳しくは[Windows Docker実証手順](docs/DOCKER_VALIDATION_WINDOWS_JA.md)を参照してください。
+詳しくは[Windows Docker実証手順](docs/validation/DOCKER_VALIDATION_WINDOWS_JA.md)を参照してください。
 
 ## ベースイメージと軽量化
 
@@ -89,7 +89,7 @@ Alpineはpost-v1.0の正式な比較対象として残します。feature parity
 同じamd64/arm64・Bridge・live Tor・脆弱性・SBOM/provenance試験に合格し、
 実測で十分な改善が出た場合だけvariantまたは既定baseとして採用します。
 公開候補ではimage size、Bootstrap時間、steady memory、PID、idle CPUをJSON証跡に
-記録します。詳細は[ベースイメージ判断](docs/BASE_IMAGE_DECISION.md)を参照してください。
+記録します。詳細は[ベースイメージ判断](docs/release/BASE_IMAGE_DECISION.md)を参照してください。
 
 ## CLI
 
@@ -110,8 +110,12 @@ toroute version
 Torのcold startではdirectory取得に時間がかかる場合があります。image healthcheckは最大420秒の起動猶予中に5秒間隔でreadyを確認し、一度readyになった後は30秒間隔の通常監視へ移ります。起動猶予中もBootstrap 100%未満をreadyとは扱いません。
 
 
-詳細は[Container RC実証記録](docs/CONTAINER_RC_EVIDENCE_JA.md)、[要件定義・設計・進捗状況](docs/REQUIREMENTS_AND_DESIGN_JA.md)、[検証報告](docs/VALIDATION_REPORT_JA.md)を参照してください。
+詳細は[Container RC実証記録](docs/history/CONTAINER_RC_EVIDENCE_JA.md)、[要件定義・設計・進捗状況](docs/core/REQUIREMENTS_AND_DESIGN_JA.md)、[検証報告](docs/history/VALIDATION_REPORT_JA.md)を参照してください。
 
 ## 公開名とOwner
 
 名称は当面ToRouteを使用します。Owner置換とGitHub／Docker Hub公開操作は、技術v1.0候補の完成後に実施します。必要になった場合はrename後に全gateを再実行します。
+
+## ドキュメント
+
+設計・設定・検証・リリース・過去証跡の入口は[ドキュメント索引](docs/README.md)です。

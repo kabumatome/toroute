@@ -27,4 +27,4 @@ package availability and reduced native dependency branching, not an assumption
 that Debian consumes less CPU. The release candidate records image/package
 inventory and live cgroup metrics. Stable releases require active reviewed
 budgets. Alpine is evaluated only as a feature-complete post-v1.0 variant; see
-`BASE_IMAGE_DECISION.md`.
+[`BASE_IMAGE_DECISION.md`](../release/BASE_IMAGE_DECISION.md).
