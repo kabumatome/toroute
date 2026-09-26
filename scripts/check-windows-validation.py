@@ -362,7 +362,7 @@ def main() -> None:
         fail("inner launcher must redirect direct execution before PowerShell discovery")
 
 
-    docs_text = (ROOT / "docs/DOCKER_VALIDATION_WINDOWS_JA.md").read_text(encoding="utf-8")
+    docs_text = (ROOT / "docs/validation/DOCKER_VALIDATION_WINDOWS_JA.md").read_text(encoding="utf-8")
     if "TOROUTE_NO_PAUSE" in docs_text or "TOROUTE_AUTOMATION" in docs_text:
         fail("user documentation may not expose a no-pause bypass")
     if "sanitize-validation-evidence.py" not in docs_text:

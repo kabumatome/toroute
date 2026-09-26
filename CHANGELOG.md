@@ -7,6 +7,9 @@
 - Add pinned actionlint v1.7.12 to CI, GHCR bootstrap, and release verification gates.
 - Make CodeQL workflow changes trigger CodeQL analysis so its own policy cannot silently drift.
 - Synchronize release documentation with the repository's current public visibility while keeping registry publication and stable tags explicitly gated.
+- Require anonymous candidate readability before exact-tag promotion and recheck exact-tag absence immediately before promotion.
+- Update pinned Docker build actions to setup-qemu v4.4.0, setup-buildx v4.4.1, and build-push v7.4.0.
+- Repair Windows validation contract paths after the documentation reorganization.
 
 
 ## 0.4.0-rc.12 — evidence provenance and public-summary hardening

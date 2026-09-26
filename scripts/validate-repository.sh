@@ -170,11 +170,20 @@ required_release_fragments = [
     'Promote exact tags within each registry',
     'Verify exact tags and update stable aliases',
     'Verify anonymous public tags and candidate identity',
+    'Verify candidate registries are anonymously readable',
+    'Recheck exact tags before promotion',
     'Create or verify draft Release',
 ]
 for fragment in required_release_fragments:
     if fragment not in release:
         raise SystemExit(f'release workflow is missing safety control: {fragment}')
+candidate_public_index = release.index('Verify candidate registries are anonymously readable')
+recheck_index = release.index('Recheck exact tags before promotion')
+promotion_index = release.index('Promote exact tags within each registry')
+if candidate_public_index > promotion_index:
+    raise SystemExit('anonymous candidate readability must be proven before exact-tag promotion')
+if recheck_index > promotion_index:
+    raise SystemExit('exact-tag absence must be rechecked immediately before promotion')
 if release.count("vars.TOROUTE_RELEASES_ENABLED == 'true'") != 2:
     raise SystemExit('release workflow must guard verification and publication with the explicit release-enable variable')
 if 'release tag must point to the current main commit' not in release:

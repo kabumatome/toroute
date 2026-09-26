@@ -25,6 +25,10 @@ the following:
 - Registry publication is disabled by default. The maintainer sets
   `TOROUTE_RELEASES_ENABLED=true` only for a deliberate release, and the tag
   must point to the current `main` commit.
+- The candidate registry package is anonymously readable and its platform identity
+  matches the tested candidate before any exact version tag is promoted.
+- Exact version tags are checked for absence both before candidate work starts and
+  again immediately before promotion, reducing the collision window.
 - Raw checkpoints, internal logs, local machine paths, bridge lines, credentials,
   private hostnames, and proprietary traffic samples are not present in the
   repository, release assets, packages, or issue/PR history.
