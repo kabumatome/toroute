@@ -65,7 +65,7 @@ jobs:
         run: echo "date=$(git show -s --format=%cI HEAD)" >>"$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}'}
       - name: Detect Docker Hub publishing
         id: dockerhub
@@ -85,7 +85,7 @@ jobs:
           echo "enabled=$enabled" >>"$GITHUB_OUTPUT"
           echo "username=$username" >>"$GITHUB_OUTPUT"
       - if: ${{ steps.dockerhub.outputs.enabled == 'true' }}
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with: {username: '${{ steps.dockerhub.outputs.username }}', password: '${{ secrets.DOCKERHUB_TOKEN }}'}
       - name: Resolve references
         id: refs
